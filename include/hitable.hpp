@@ -1,13 +1,14 @@
 #ifndef HITABLE_HPP
 #define HITABLE_HPP
-
+#include <memory>
 #include "Ray.hpp"
-
+class Material;
 struct HitRecord
 {
     float t;
     fm::math::vec3 p;
     fm::math::vec3 normal;
+    std::shared_ptr<Material> material;
 };
 
 class Hitable

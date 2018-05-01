@@ -21,11 +21,6 @@ Camera::Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, co
 
     horizontal = 2*halfWidth*u;
     vertical = 2*halfHeight*v;
-    //std::cout << fOrigin << std::endl;
-    //std::cout << lowerLeftCorner << std::endl;
-    //std::cout << horizontal << std::endl;
-    //std::cout << vertical << std::endl;
-    //std::cout << u << std::endl;
 
 }
 

@@ -1,9 +1,11 @@
 #include "sphere.h"
+#include "material.h"
 using namespace fm::math;
-Sphere::Sphere(const fm::math::vec3 center, float radius)
+Sphere::Sphere(const fm::math::vec3 center, float radius, const std::shared_ptr<Material> &mat)
 {
     fCenter = center;
     fRadius = radius;
+    fMat = mat;
 }
 
 Sphere::Sphere()
@@ -14,6 +16,7 @@ Sphere::Sphere()
 
 bool Sphere::Hit(const Ray &r, float tMin, float tMax, HitRecord &record) const
 {
+    record.material = fMat;
     vec3 oc = r.GetOrigin() - fCenter;
     float a = dot(r.GetDirection());
     float c = dot(oc) - fRadius*fRadius;

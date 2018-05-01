@@ -1,9 +1,10 @@
-#ifndef FUNCTIONS_H
-#define FUNCTIONS_H
+#pragma once
 #include <cmath>
 
 namespace fm {
 namespace math {
+
+
     constexpr double pi() {
         return M_PI;
     }
@@ -58,4 +59,4 @@ namespace math {
 
 // TODO fast cos and sin
 }
-#endif
+

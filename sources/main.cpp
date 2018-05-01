@@ -9,18 +9,13 @@
 #include <limits>
 #include "sphere.h"
 #include <random>
+#include "Math/helpers.h"
+#include "material.h"
+#include <omp.h>
+
 using namespace fm::math;
 
-/*****RANDOM IN SPHERE UNIT****/
-vec3 randomInUnitSphere() {
-    vec3 p;
-   do
-    {
-        p = 2.0f*vec3(drand48(), drand48(), drand48()) - vec3(1,1,1);
 
-    }while(sqrt(dot(p))>= 1.0);
-    return p;
-}
 
 bool run = true;
 
@@ -48,13 +43,20 @@ void ShutdownTest()
 }
 
 
-vec3 Color(const Ray &r, World *world)
+vec3 Color(const Ray &r, World *world, int depth)
 {
     HitRecord record;
     if(world->Hit(r, 0.001f, std::numeric_limits<float>::max(), record))
     {
-        vec3 target = record.p + record.normal + randomInUnitSphere();
-        return 0.5f*Color(Ray(record.p, target - record.p), world);
+        Ray scattered;
+        vec3 attenuation;
+        if(depth < 50 && record.material->Scatter(r, record, attenuation, scattered))
+        {
+            return attenuation*Color(scattered, world, depth + 1);
+        }else
+        {
+            return vec3(0,0,0);
+        }
     }
 
     vec3 dir = normalize(r.GetDirection());
@@ -66,10 +68,11 @@ vec3 Color(const Ray &r, World *world)
 static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, void* data_)
 {
     JobData& data = *(JobData*)data_;
-    unsigned char* backBuffer = data.backBuffer + data.width*3*start;
-    unsigned long int ns = 4;
+    unsigned long int ns = 12;
     for(unsigned long y = start; y < end; ++y)
     {
+        unsigned char* backBuffer = data.backBuffer + data.width*3*(data.height - y - 1);
+
          for(unsigned long x = 0; x < data.width; ++x)
          {
              vec3 color(0,0,0);
@@ -78,7 +81,38 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
                  float u = float(x + drand48())/float(data.width);
                  float v = float(y + drand48())/float(data.height);
                  Ray r = data.camera->GetRay(u,v);
-                 vec3 col = Color(r, data.world);
+                 vec3 col = Color(r, data.world, 0);
+                 color += col;
+             }
+             color/=(float)ns;
+             color = vec3(sqrt(color.x), sqrt(color.y), sqrt(color.z));
+             backBuffer[0] = color.x*255.99f;
+             backBuffer[1] = color.y*255.99f;
+             backBuffer[2] = color.z*255.99f;
+             backBuffer += 3;
+         }
+     }
+
+}
+
+static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world)
+{
+   const unsigned long int ns = 12;
+
+   #pragma omp parallel for num_threads(4)
+    for(unsigned long y = 0; y < height; ++y)
+    {
+        unsigned char* backBuffer = buffer + width*3*(height - y - 1);
+
+         for(unsigned long x = 0; x < width; ++x)
+         {
+             vec3 color(0,0,0);
+             for(unsigned long s = 0; s < ns; ++s)
+             {
+                 float u = float(x + drand48())/float(width);
+                 float v = float(y + drand48())/float(height);
+                 Ray r = camera->GetRay(u,v);
+                 vec3 col = Color(r, world, 0);
                  color += col;
              }
              color/=(float)ns;
@@ -93,27 +127,10 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
 }
 
 
-
-void Flip(unsigned char* backBuffer, unsigned char *buffer, unsigned long start, unsigned long end, unsigned long width, unsigned long height)
-{
-    //Revert
-    memcpy(buffer, backBuffer, width*height*3);
-    for(unsigned long y = start; y < end; ++y)
-    {
-        memcpy(backBuffer + y*width*3, buffer + (height - y - 1)*width*3, width*3);
-    }
-}
-
-static void ThreadedFlip(uint32_t start, uint32_t end, uint32_t threadnum, void* data_)
-{
-    JobData& data = *(JobData*)data_;
-    Flip(data.backBuffer, data.buffer, start, end, data.width, data.height);
-}
-
-void Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world, unsigned char *buffer)
+void Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
 {
     Camera cam(vec3(0,0,0),vec3(0,0,1),vec3(0,1,0),90,float(width)/float(height));
-
+/*
     JobData args;
     args.width = width;
     args.height = height;
@@ -121,22 +138,13 @@ void Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, 
     args.camera = &cam;
     args.world = world;
     enkiTaskSet* task = enkiCreateTaskSet(g_TS, UpdateRayTracer);
-    bool threaded = false;
+    bool threaded = true;
     enkiAddTaskSetToPipeMinRange(g_TS, task, &args, height, threaded ? 4 : height);
 
     enkiWaitForTaskSet(g_TS, task);
-    enkiDeleteTaskSet(task);
+    enkiDeleteTaskSet(task);*/
+    UpdateRayTracer(width, height, backBuffer,&cam, world);
 
-    //enkiTaskSet* taskRevert = enkiCreateTaskSet(g_TS, ThreadedFlip);
-    //JobData argsFlip;
-    //argsFlip.backBuffer = backBuffer;
-    //argsFlip.buffer = buffer;
-    //argsFlip.width = width;
-    //argsFlip.height = height;
-    //enkiAddTaskSetToPipeMinRange(g_TS, taskRevert, &argsFlip, height, threaded ? 4 : height);
-    //
-    //enkiDeleteTaskSet(taskRevert);
-    Flip(backBuffer, buffer, 0, height, width, height);
 
 
 }
@@ -157,7 +165,6 @@ int main()
     SDL_Surface * screen = SDL_GetWindowSurface(window);
 
     unsigned char *data = new unsigned char[width * height * 3];
-    unsigned char *buffer = new unsigned char[width * height * 3];
 
     Uint32 rmask, gmask, bmask, amask;
 
@@ -183,12 +190,19 @@ int main()
 
     InitializeTest();
 
+
     World world;
-    std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f);
-    std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f);
+    std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
+    std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
+    std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
+    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.8,0.8),0.8f));
+
 
     world.AddObject(sphere);
     world.AddObject(sphere2);
+    world.AddObject(sphere3);
+    world.AddObject(sphere4);
+
 
     while (run)
     {
@@ -196,7 +210,7 @@ int main()
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) run = false;
         }
-        Draw(data, width, height, &world, buffer);
+        Draw(data, width, height, &world);
         SDL_BlitSurface(imageSurface, NULL, screen, &surfaceToBlit);
 
         SDL_UpdateWindowSurface(window);

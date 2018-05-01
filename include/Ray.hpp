@@ -5,6 +5,7 @@
 class Ray
 {
 public:
+    Ray() {}
 Ray(const fm::math::vec3 &inOrigin, const fm::math::vec3 inDirection);
 ~Ray();
 inline const fm::math::vec3& GetOrigin() const { return fOrigin;}
