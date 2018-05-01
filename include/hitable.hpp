@@ -8,7 +8,7 @@ struct HitRecord
     float t;
     fm::math::vec3 p;
     fm::math::vec3 normal;
-    std::shared_ptr<Material> material;
+    Material* material;
 };
 
 class Hitable

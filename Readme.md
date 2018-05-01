@@ -8,5 +8,6 @@ Raytracer v1:
 
 ![Raytracer](images/raytracer.png "Raytracer")
 
-
+# TODO
+[Accelerating monte-carlo](http://www.ipol.im/pub/art/2015/119/)
 

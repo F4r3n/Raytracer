@@ -118,8 +118,8 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
              vec3 color(0,0,0);
              for(unsigned long s = 0; s < ns; ++s)
              {
-                 float u = float(x + drand48())/float(data.width);
-                 float v = float(y + drand48())/float(data.height);
+                 float u = float(x + fm::math::floatRand())/float(data.width);
+                 float v = float(y + fm::math::floatRand())/float(data.height);
                  Ray r = data.camera->GetRay(u,v);
                  vec3 col = Color(r, data.world, 0,*data.rayCount);
                  color += col;
@@ -140,8 +140,11 @@ static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned 
    const unsigned long int ns = 12;
 unsigned long y;
 unsigned long x;
+const float invWidth = 1.0f/float(width);
+const float invHeight = 1.0f/float(height);
+
    #pragma omp parallel for \
-    shared(camera, world, buffer, width, height, rayCount) \
+    shared(camera, world, buffer, rayCount,  width, height) \
     private(y, x) schedule(dynamic)
     for(y = 0; y < height; ++y)
     {
@@ -152,8 +155,8 @@ unsigned long x;
              vec3 color(0,0,0);
              for(unsigned long s = 0; s < ns; ++s)
              {
-                 float u = float(x + drand48())/float(width);
-                 float v = float(y + drand48())/float(height);
+                 float u = float(x + fm::math::floatRand())*invWidth;
+                 float v = float(y + fm::math::floatRand())*invHeight;
                  Ray r = camera->GetRay(u,v);
                  vec3 col = Color(r, world, 0, rayCount);
                  color += col;
@@ -271,7 +274,7 @@ int main()
         std::stringstream stream;
         stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
         std::string s = stream.str() + " mr/s";
-        SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 255, 255});
+        SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 0, 0});
 
         SDL_BlitSurface(surfaceMessage, NULL, imageSurface, NULL);
         SDL_BlitSurface(imageSurface, NULL, screen, &surfaceToBlit);
