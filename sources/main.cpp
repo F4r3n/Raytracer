@@ -98,13 +98,16 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
 static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world)
 {
    const unsigned long int ns = 12;
-
-   #pragma omp parallel for num_threads(4)
-    for(unsigned long y = 0; y < height; ++y)
+unsigned long y;
+unsigned long x;
+   #pragma omp parallel for \
+    shared(camera, world, buffer, width, height) \
+    private(y, x) schedule(static)
+    for(y = 0; y < height; ++y)
     {
         unsigned char* backBuffer = buffer + width*3*(height - y - 1);
 
-         for(unsigned long x = 0; x < width; ++x)
+         for(x = 0; x < width; ++x)
          {
              vec3 color(0,0,0);
              for(unsigned long s = 0; s < ns; ++s)
