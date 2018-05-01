@@ -12,6 +12,45 @@
 #include "Math/helpers.h"
 #include "material.h"
 #include <omp.h>
+#include <chrono>
+#include <SDL2/SDL_ttf.h>
+#include <sstream>
+#include <iomanip>
+#define WITH_ENKITS 0
+
+class Profile {
+
+public:
+    Profile() {
+        start = std::chrono::system_clock::now();
+        running= true;
+    }
+    Profile(const std::string& name)
+    {
+        fName = name;
+        start = std::chrono::system_clock::now();
+        running = true;
+    }
+
+    ~Profile()
+    {
+        stop();
+    }
+
+    void stop()
+    {
+        end = std::chrono::system_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        running = false;
+    }
+    unsigned long elapsed = 0;
+
+private:
+    std::chrono::system_clock::time_point start;
+    std::chrono::system_clock::time_point end;
+    std::string fName;
+    bool running = false;
+};
 
 using namespace fm::math;
 
@@ -26,7 +65,7 @@ struct JobData
     unsigned char* backBuffer;
     Camera *camera;
     World *world;
-    unsigned char* buffer;
+    unsigned long *rayCount;
 };
 
 static enkiTaskScheduler* g_TS;
@@ -43,8 +82,9 @@ void ShutdownTest()
 }
 
 
-vec3 Color(const Ray &r, World *world, int depth)
+vec3 Color(const Ray &r, World *world, int depth, unsigned long &rayCount)
 {
+    rayCount++;
     HitRecord record;
     if(world->Hit(r, 0.001f, std::numeric_limits<float>::max(), record))
     {
@@ -52,7 +92,7 @@ vec3 Color(const Ray &r, World *world, int depth)
         vec3 attenuation;
         if(depth < 50 && record.material->Scatter(r, record, attenuation, scattered))
         {
-            return attenuation*Color(scattered, world, depth + 1);
+            return attenuation*Color(scattered, world, depth + 1, rayCount);
         }else
         {
             return vec3(0,0,0);
@@ -81,7 +121,7 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
                  float u = float(x + drand48())/float(data.width);
                  float v = float(y + drand48())/float(data.height);
                  Ray r = data.camera->GetRay(u,v);
-                 vec3 col = Color(r, data.world, 0);
+                 vec3 col = Color(r, data.world, 0,*data.rayCount);
                  color += col;
              }
              color/=(float)ns;
@@ -95,14 +135,14 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
 
 }
 
-static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world)
+static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world, unsigned long &rayCount)
 {
    const unsigned long int ns = 12;
 unsigned long y;
 unsigned long x;
    #pragma omp parallel for \
-    shared(camera, world, buffer, width, height) \
-    private(y, x) schedule(static)
+    shared(camera, world, buffer, width, height, rayCount) \
+    private(y, x) schedule(dynamic)
     for(y = 0; y < height; ++y)
     {
         unsigned char* backBuffer = buffer + width*3*(height - y - 1);
@@ -115,7 +155,7 @@ unsigned long x;
                  float u = float(x + drand48())/float(width);
                  float v = float(y + drand48())/float(height);
                  Ray r = camera->GetRay(u,v);
-                 vec3 col = Color(r, world, 0);
+                 vec3 col = Color(r, world, 0, rayCount);
                  color += col;
              }
              color/=(float)ns;
@@ -130,25 +170,30 @@ unsigned long x;
 }
 
 
-void Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
+unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
 {
     Camera cam(vec3(0,0,0),vec3(0,0,1),vec3(0,1,0),90,float(width)/float(height));
-/*
+    unsigned long rayCount = 0;
+#if WITH_ENKITS
+    std::cout << "enkits" << std::endl;
     JobData args;
     args.width = width;
     args.height = height;
     args.backBuffer = backBuffer;
     args.camera = &cam;
     args.world = world;
+    args.rayCount = &rayCount;
     enkiTaskSet* task = enkiCreateTaskSet(g_TS, UpdateRayTracer);
     bool threaded = true;
     enkiAddTaskSetToPipeMinRange(g_TS, task, &args, height, threaded ? 4 : height);
 
     enkiWaitForTaskSet(g_TS, task);
-    enkiDeleteTaskSet(task);*/
-    UpdateRayTracer(width, height, backBuffer,&cam, world);
-
-
+    enkiDeleteTaskSet(task);
+#else
+    std::cout << "OpenMP" << std::endl;
+    UpdateRayTracer(width, height, backBuffer,&cam, world, rayCount);
+#endif
+return rayCount;
 
 }
 
@@ -206,6 +251,12 @@ int main()
     world.AddObject(sphere3);
     world.AddObject(sphere4);
 
+    if(TTF_Init() == -1)
+    {
+        fprintf(stderr, "Erreur d'initialisation de TTF_Init : %s\n", TTF_GetError());
+          exit(EXIT_FAILURE);
+    }
+    TTF_Font* arial = TTF_OpenFont("Resources/arial.ttf", 12);
 
     while (run)
     {
@@ -213,12 +264,25 @@ int main()
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) run = false;
         }
-        Draw(data, width, height, &world);
+        Profile p;
+        unsigned long rayCount = Draw(data, width, height, &world);
+        p.stop();
+        std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
+        std::string s = stream.str() + " mr/s";
+        SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 255, 255});
+
+        SDL_BlitSurface(surfaceMessage, NULL, imageSurface, NULL);
         SDL_BlitSurface(imageSurface, NULL, screen, &surfaceToBlit);
 
         SDL_UpdateWindowSurface(window);
         SDL_Delay(33);
+        SDL_FreeSurface(surfaceMessage);
+
     }
+    SDL_FreeSurface(imageSurface);
+
     SDL_DestroyWindow(window);
     SDL_Quit();
 
