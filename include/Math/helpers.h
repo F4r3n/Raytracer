@@ -37,6 +37,14 @@ inline bool refract(const vec3& v, const vec3 &n, float niOverNt, vec3 &refracte
     }
     return false;
 }
+
+inline float schlick(float cosine, float refIDx)
+{
+    float r0 = (1.0f - refIDx)/( 1.0f + refIDx);
+    r0 = r0*r0;
+    return r0 + (1 - r0)*pow((1-cosine),5);
+}
+
 }
 
 }

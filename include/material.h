@@ -5,6 +5,10 @@
 #include "Math/helpers.h"
 #include <iostream>
 
+
+typedef fm::math::vec3 vec3;
+
+
 template <typename T>
 T clamp(T v, T max, T min)
 {
@@ -51,6 +55,53 @@ public:
     fm::math::vec3 albedo;
     float fFuzz;
 };
+
+class Dielectric : public Material
+{
+public:
+    Dielectric(float ri) : refIDx(ri) {}
+    virtual bool Scatter(const Ray &ray, const HitRecord &record, fm::math::vec3 &attenuation, Ray &scattered)
+    {
+        fm::math::vec3 outwardNormal;
+        vec3 reflected = reflectance(ray.GetDirection(), record.normal);
+        float niOverNt;
+        attenuation = vec3(1.0,1.0,1.0);
+        vec3 refracted;
+        float cosine;
+        float reflectProbe;
+        if(dot(ray.GetDirection(), record.normal) > 0)
+        {
+            outwardNormal = -record.normal;
+            niOverNt = refIDx;
+            cosine = refIDx*dot(ray.GetDirection(), record.normal)/(length(ray.GetDirection()));
+        }else
+        {
+            outwardNormal = record.normal;
+            niOverNt = 1.0f/refIDx;
+            cosine = -dot(ray.GetDirection(), record.normal)/(length(ray.GetDirection()));
+        }
+
+        if(refract(ray.GetDirection(), outwardNormal, niOverNt, refracted))
+        {
+            reflectProbe = fm::math::schlick(cosine, refIDx);
+        }else {
+            reflectProbe = 1.0f;
+        }
+
+        if(fm::math::floatRand() < reflectProbe)
+        {
+            scattered = Ray(record.p, reflected);
+        }else
+        {
+            scattered = Ray(record.p, refracted);
+        }
+
+        return true;
+    }
+
+     float refIDx;
+};
+
 
 #endif // MATERIAL
 

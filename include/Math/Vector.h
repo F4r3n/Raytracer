@@ -162,7 +162,7 @@ template <typename T> struct vec<T, 3> {
         z = 0;
     }
 
-    inline T norme() {
+    inline T length() {
         return sqrt(x * x + y * y + z * z);
     }
 
@@ -193,6 +193,7 @@ template <typename T> vec<T, 3>& vec<T, 3>::operator+=(const vec<T, 1>& b) {
     this->z += b.x;
     return *this;
 }
+
 
 template <typename T> template <typename P> vec<T, 3>& vec<T, 3>::operator+=(const vec<P, 1>& b) {
     this->x += static_cast<T>(b.x);
@@ -433,6 +434,10 @@ template <typename T> vec<T, 4> operator/(const vec<T, 4>& a, T b) {
     return vec<T, 4>(a.x / b, a.y / b, a.z / b, a.w / b);
 }
 
+template <typename T> vec<T, 3> operator-(const vec<T, 3>& a) {
+    return vec<T, 3>(-a.x, -a.y, -a.z);
+}
+
 /*****************NORMALIZE*************************/
 template <typename T> vec<T, 4> normalize(const vec<T, 4>& vector) {
     T s = 1.0/sqrt(vector.x*vector.x + vector.y*vector.y + vector.z*vector.z + vector.w*vector.w);
@@ -459,7 +464,9 @@ template <typename T> T dot(const vec<T, 3>& a) {
 template <typename T> vec<T,3> cross(const vec<T, 3>& a, const vec<T, 3>& b) {
     return vec<T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - a.y*b.x);
 }
-
-
+template <typename T>
+T length(const vec<T, 3>& a) {
+    return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+}
 }
 }

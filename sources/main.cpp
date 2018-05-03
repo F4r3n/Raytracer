@@ -137,7 +137,7 @@ static void UpdateRayTracer(uint32_t start, uint32_t end, uint32_t threadnum, vo
 
 static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world, unsigned long &rayCount)
 {
-   const unsigned long int ns = 12;
+   const unsigned long int ns = 64;
 unsigned long y;
 unsigned long x;
 const float invWidth = 1.0f/float(width);
@@ -175,7 +175,9 @@ const float invHeight = 1.0f/float(height);
 
 unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
 {
-    Camera cam(vec3(0,0,0),vec3(0,0,1),vec3(0,1,0),90,float(width)/float(height));
+    vec3 lookfrom(0,0.3,0.5);
+    vec3 lookat(0,0.4,1);
+    Camera cam(lookfrom,lookat,vec3(0,1,0),60,float(width)/float(height), 0.01f, length(lookfrom - lookat));
     unsigned long rayCount = 0;
 #if WITH_ENKITS
     std::cout << "enkits" << std::endl;
@@ -246,13 +248,16 @@ int main()
     std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
     std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
     std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
-    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.8,0.8),0.8f));
+    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Dielectric>(1.5f));
+    std::unique_ptr<Hitable> sphere5 = std::make_unique<Sphere>(vec3(-1,0,-1),-0.45f, std::make_shared<Dielectric>(1.5f));
 
 
     world.AddObject(sphere);
     world.AddObject(sphere2);
     world.AddObject(sphere3);
     world.AddObject(sphere4);
+    world.AddObject(sphere5);
+
 
     if(TTF_Init() == -1)
     {

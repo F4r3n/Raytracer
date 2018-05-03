@@ -1,11 +1,12 @@
 #include "camera.h"
 #include "Math/Functions.h"
 #include <iostream>
-
+#include "Math/helpers.h"
 using namespace fm::math;
 //TODO add focus camera
-Camera::Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, const fm::math::vec3 &vup, float fov, float aspect)
+Camera::Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, const fm::math::vec3 &vup, float fov, float aspect, float aperture, float focusDist)
 {
+    lensRadius = aperture;
     fOrigin = origin;
     fDirection = direction;
 
@@ -17,16 +18,19 @@ Camera::Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, co
     u = normalize(cross(vup, w));
     v = cross(w, u);
 
-    lowerLeftCorner = origin - halfWidth*u - halfHeight*v - w;
+    //lowerLeftCorner = vec3(-halfWidth, -halfHeight, -1.0f);
+    lowerLeftCorner = origin - halfWidth*focusDist*u - halfHeight*v*focusDist - w;
 
-    horizontal = 2*halfWidth*u;
-    vertical = 2*halfHeight*v;
+    horizontal = 2*halfWidth*focusDist*u;
+    vertical = 2*halfHeight*v*focusDist;
 
 }
 
 Ray Camera::GetRay(float x, float y) const
 {
-    return Ray(fOrigin, normalize(lowerLeftCorner + x*horizontal + y*vertical - fOrigin));
+    vec3 rd = lensRadius*fm::math::randomInUnitSphere();
+    vec3 offset = u*rd.x + v*rd.y;
+    return Ray(fOrigin + offset, normalize(lowerLeftCorner + x*horizontal + y*vertical - fOrigin - offset));
 }
 
 

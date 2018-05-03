@@ -6,7 +6,7 @@ class Camera
 {
 public:
 
-    Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, const fm::math::vec3 &vup, float fov, float aspect);
+    Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, const fm::math::vec3 &vup, float fov, float aspect, float aperture = 1.0f, float focusDist = 1.0f);
     Ray GetRay(float u, float v) const;
 private:
     fm::math::vec3 horizontal;
@@ -15,6 +15,7 @@ private:
     fm::math::vec3 lowerLeftCorner;
     fm::math::vec3 fOrigin;
     fm::math::vec3 fDirection;
+    float lensRadius;
 };
 
 #endif // CAMERA_H
