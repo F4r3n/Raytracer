@@ -28,9 +28,15 @@ Camera::Camera(const fm::math::vec3 &origin, const fm::math::vec3 &direction, co
 
 Ray Camera::GetRay(float x, float y) const
 {
-    vec3 rd = lensRadius*fm::math::randomInUnitSphere();
-    vec3 offset = u*rd.x + v*rd.y;
-    return Ray(fOrigin + offset, normalize(lowerLeftCorner + x*horizontal + y*vertical - fOrigin - offset));
+    if(lensRadius > 0)
+    {
+        vec3 rd = lensRadius*fm::math::randomInUnitSphere();
+        vec3 offset = u*rd.x + v*rd.y;
+        return Ray(fOrigin + offset, normalize(lowerLeftCorner + x*horizontal + y*vertical - fOrigin - offset));
+    }else
+    {
+        return Ray(fOrigin, normalize(lowerLeftCorner + x*horizontal + y*vertical - fOrigin));
+    }
 }
 
 
