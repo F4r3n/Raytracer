@@ -1,4 +1,8 @@
+#if __unix__
 #define SIMD 1
+#else
+#define SIMD 0
+#endif
 
 #include <iostream>
 #include "Math/Functions.h"

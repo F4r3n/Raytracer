@@ -488,7 +488,19 @@ template <typename T> vec<T, 2> normalize(const vec<T, 2>& vector) {
 }
 /*****DOT****/
 template <typename T> T dot(const vec<T, 3>& a, const vec<T, 3>& b) {
+#if !SIMD
     return a.x*b.x + a.y*b.y + a.z*b.z;
+#else
+     __m128 mulRes, shufReg, sumsReg;
+         mulRes = _mm_mul_ps(a.mmvalue, b.mmvalue);
+
+         // Calculates the sum of SSE Register - https://stackoverflow.com/a/35270026/195787
+         shufReg = _mm_movehdup_ps(mulRes);        // Broadcast elements 3,1 to 2,0
+         sumsReg = _mm_add_ps(mulRes, shufReg);
+         shufReg = _mm_movehl_ps(shufReg, sumsReg); // High Half -> Low Half
+         sumsReg = _mm_add_ss(sumsReg, shufReg);
+         return  _mm_cvtss_f32(sumsReg); // Result in the lower part of the SSE Register
+#endif
 }
 template <typename T> T dot(const vec<T, 3>& a) {
     return a.x*a.x + a.y*a.y + a.z*a.z;
