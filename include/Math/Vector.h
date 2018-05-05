@@ -1,6 +1,6 @@
 #pragma once
 #include <ostream>
-
+#include <smmintrin.h>
 namespace fm {
 namespace math {
 template <typename T, std::size_t size> struct vec;
@@ -130,15 +130,32 @@ template <typename T> template <typename P> vec<T, 2>& vec<T, 2>::operator*=(con
     return *this;
 }
 
-template <typename T> struct vec<T, 3> {
-    T x, y, z;
+#if SIMD
+template <typename T>
+#ifdef __GNUC__
+struct __attribute__((aligned (16))) vec<T, 3>
+#else
+_MM_ALIGN16 struct vec<T, 3>
+#endif
+#else
+template <typename T>
+ struct vec<T, 3>
+#endif
+{
+    union
+       {
+           struct { T x, y, z; };
+           __m128 mmvalue;
+       };
 
     vec<T, 3>(T x, T y, T z) {
         this->x = x;
         this->y = y;
         this->z = z;
     }
-
+#if SIMD
+    inline vec<T, 3>(__m128 m) : mmvalue(m) {}
+#endif
     vec<T, 3>() {
     }
     // Operator +=
@@ -202,10 +219,15 @@ template <typename T> template <typename P> vec<T, 3>& vec<T, 3>::operator+=(con
     return *this;
 }
 
-template <typename T> vec<T, 3>& vec<T, 3>::operator+=(const vec<T, 3>& b) {
-    this->x += b.x;
-    this->y += b.y;
-    this->z += b.z;
+template <typename T> vec<T, 3>& vec<T, 3>::operator+=(const vec<T, 3>& b)
+ {
+#if SIMD
+    mmvalue = _mm_add_ps(mmvalue, b.mmvalue);
+#else
+     this->x += b.x;
+     this->y += b.y;
+     this->z += b.z;
+#endif
     return *this;
 }
 
@@ -230,9 +252,14 @@ template <typename T> vec<T, 3>& vec<T, 3>::operator=(const vec<T, 3>& b) {
 }
 
 template <typename T> vec<T, 3>& vec<T, 3>::operator*=(const vec<T, 3>& b) {
-    this->x *= b.x;
-    this->y *= b.y;
-    this->z *= b.z;
+
+#if SIMD
+    mmvalue = _mm_mul_ps(mmvalue, b.mmvalue);
+#else
+     this->x *= b.x;
+     this->y *= b.y;
+     this->z *= b.z;
+#endif
     return *this;
 }
 
@@ -399,8 +426,14 @@ template <typename T> vec<T, 2> operator*(const vec<T, 2>& a, T b) {
     return vec<T, 2>(a.x * b, a.y * b);
 }
 
-template <typename T> vec<T, 3> operator*(const vec<T, 3>& a, const vec<T, 3>& b) {
+template <typename T>
+ vec<T, 3> operator*(const vec<T, 3>& a, const vec<T, 3>& b)
+ {
+#if !SIMD
     return vec<T, 3>(a.x * b.x, a.y * b.y, a.z * b.z);
+#else
+     return _mm_mul_ps(a.mmvalue, b.mmvalue);
+#endif
 }
 template <typename T> vec<T, 3> operator*(const vec<T, 3>& a, T b) {
     return vec<T, 3>(a.x * b, a.y * b, a.z * b);

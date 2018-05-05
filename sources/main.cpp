@@ -1,3 +1,5 @@
+#define SIMD 1
+
 #include <iostream>
 #include "Math/Functions.h"
 #include <SDL.h>
@@ -15,7 +17,12 @@
 #include <SDL2/SDL_ttf.h>
 #include <sstream>
 #include <iomanip>
+
+#define EARLY_DISPLAY 1
+
+#if EARLY_DISPLAY
 #include <thread>
+#endif
 
 class Profile {
 
@@ -119,9 +126,9 @@ const float invHeight = 1.0f/float(height);
 }
 
 
-unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
+unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world, vec3 pos)
 {
-    vec3 lookfrom(0,0,0);
+    vec3 lookfrom = pos;
     vec3 lookat(0,0,1);
     Camera cam(lookfrom,lookat,vec3(0,1,0),90,float(width)/float(height), 0.0f, 1.0f);
     unsigned long rayCount = 0;
@@ -132,7 +139,7 @@ unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long
 
 }
 
-void copyAvergareRecursif(unsigned int n, unsigned long width, unsigned long height, unsigned char* backBuffer, unsigned char* buffer)
+void CopyAvergareRecursif(unsigned int n, unsigned long width, unsigned long height, unsigned char* backBuffer, unsigned char* buffer)
 {
     unsigned char* bufferTemp = buffer;
     unsigned char* backBufferTemp = backBuffer;
@@ -142,36 +149,55 @@ void copyAvergareRecursif(unsigned int n, unsigned long width, unsigned long hei
         for(unsigned long x = 0; x < width; ++x)
         {
             *backBufferTemp = float(*backBufferTemp*n + *bufferTemp++)/float(n+ 1);
-            *backBufferTemp++;
+            backBufferTemp++;
             *backBufferTemp = float(*backBufferTemp*n + *bufferTemp++)/float(n+ 1);
-            *backBufferTemp++;
+            backBufferTemp++;
             *backBufferTemp = float(*backBufferTemp*n + *bufferTemp++)/float(n+ 1);
-            *backBufferTemp++;
+            backBufferTemp++;
 
         }
     }
 }
+static vec3 pos;
+static unsigned long rayCount;
+#if EARLY_DISPLAY
+static unsigned long elapsedTime;
 
 void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
 {
     int n = 0;
     unsigned char *data = new unsigned char[width * height * 3];
+    vec3 previousPos = vec3(0,0,0);
     while(run)
     {
+        if(length(pos - previousPos) > 0)
+        {
+            previousPos = pos;
+            n = 0;
+        }
         if(n < 128)
         {
-            Draw(data, width, height, world);
-            copyAvergareRecursif(n, width, height, backBuffer, data);
+             Profile p;
+            rayCount = Draw(data, width, height, world, pos);
+            p.stop();
+            elapsedTime = p.elapsed;
+            CopyAvergareRecursif(n, width, height, backBuffer, data);
             n++;
         }
-std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     delete data;
 }
+#endif
 
 
 int main()
 {
+    vec3 a = vec3(1,1,1);
+    a+=vec3(1,1,2);
+    std::cout << a << std::endl;
+    std::cout << a.x << std::endl;
+    //return 0;
 
     const unsigned long width = 1024;
     const unsigned long height = 512;
@@ -214,15 +240,17 @@ int main()
     std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
     std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
     std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
-    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Dielectric>(1.5f));
-    std::unique_ptr<Hitable> sphere5 = std::make_unique<Sphere>(vec3(-1,0,-1),-0.45f, std::make_shared<Dielectric>(1.5f));
+    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
+    //std::unique_ptr<Hitable> sphere5 = std::make_unique<Sphere>(vec3(-1,0,-1),-0.45f, std::make_shared<Dielectric>(1.5f));
+    //std::unique_ptr<Hitable> sphere6 = std::make_unique<Sphere>(vec3(-1,0,-1.5),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
 
 
     world.AddObject(sphere);
     world.AddObject(sphere2);
     world.AddObject(sphere3);
     world.AddObject(sphere4);
-    world.AddObject(sphere5);
+    //world.AddObject(sphere5);
+    //world.AddObject(sphere6);
 
 
     if(TTF_Init() == -1)
@@ -231,41 +259,51 @@ int main()
           exit(EXIT_FAILURE);
     }
     TTF_Font* arial = TTF_OpenFont("Resources/arial.ttf", 12);
-    bool over = false;
-    unsigned long rayCount;
 
+#if EARLY_DISPLAY
     std::thread t(runGraphicThread, data, width, height, &world);
-
+#endif
 
     while (run)
     {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) run = false;
+
         }
+
+
+         std::stringstream stream;
+#if !EARLY_DISPLAY
         Profile p;
-        if(!over)
-        {
-            //rayCount = Draw(data, width, height, &world);
-            over = true;
-            p.stop();
-            std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
-            std::stringstream stream;
-            stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
-            std::string s = stream.str() + " mr/s";
-            //SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 0, 0});
+        rayCount = Draw(data, width, height, &world, pos);
+        p.stop();
+        std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
+        stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
 
+#else
+         stream << std::fixed << std::setprecision(2) << (rayCount/(elapsedTime/(1000.0f)))/1000000.0f;
+#endif
 
-            //SDL_BlitSurface(surfaceMessage, NULL, imageSurface, NULL);
-        }
+        std::string s = stream.str() + " mr/s";
+        SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 0, 0});
+
+#if !EARLY_DISPLAY
+        SDL_BlitSurface(surfaceMessage, NULL, imageSurface, NULL);
+#else
+        std::cout << s << std::endl;
+#endif
+
         SDL_BlitSurface(imageSurface, NULL, screen, &surfaceToBlit);
 
         SDL_UpdateWindowSurface(window);
-        SDL_Delay(33);
-        //SDL_FreeSurface(surfaceMessage);
+        SDL_Delay(16);
+        SDL_FreeSurface(surfaceMessage);
 
     }
+    #if EARLY_DISPLAY
     t.join();
+#endif
     SDL_FreeSurface(imageSurface);
 
     SDL_DestroyWindow(window);

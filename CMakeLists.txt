@@ -23,13 +23,11 @@ include_directories("include")
 file(GLOB_RECURSE HEADERS "include/*.h" "include/*.hpp")
 file(GLOB_RECURSE SOURCES "sources/*.cpp")
 
-#enkiTS (scheduler)
-INCLUDE_DIRECTORIES("extern/enkiTS/src")
-LINK_DIRECTORIES("extern/enkiTS/build")
-
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${CMAKE_PROJECT_NAME} SDL2 ${SDL2TTF_LIBRARY} pthread enkiTS)
+target_link_libraries(${CMAKE_PROJECT_NAME} SDL2 ${SDL2TTF_LIBRARY} pthread)
+
+
 if(UNIX)
         set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
         find_package(Threads REQUIRED)
