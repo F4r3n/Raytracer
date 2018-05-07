@@ -28,7 +28,7 @@ public:
         fm::math::vec3 target = record.p + record.normal + fm::math::randomInUnitSphere();
         scattered = Ray(record.p, target - record.p);
         attenuation = albedo;
-        if(texture && texture->isValid())
+        if(texture && texture->IsValid())
         {
             fm::math::vec4 colorTexture = texture->GetValue(record.uv.x, record.uv.y);
             attenuation.x*=colorTexture.x;

@@ -2,6 +2,8 @@
 #include "Math/helpers.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include <iostream>
 Texture::Texture(unsigned long width, unsigned long height)
 {
@@ -26,6 +28,26 @@ Texture::Texture()
     fNumberCanals = 0;
     fData = nullptr;
 }
+Texture::Texture(unsigned char* inData, unsigned long width, unsigned long height, unsigned int numberCanals, bool copy)
+{
+    fWidth = width;
+    fHeight = height;
+    fNumberCanals = numberCanals;
+    if(copy)
+    {
+        fData = new unsigned char[width*height*numberCanals];
+        memcpy(fData, inData, width*height*numberCanals);
+
+    }else
+    {
+        fData = inData;
+    }
+}
+
+unsigned char* Texture::GetPtr()
+{
+    return fData;
+}
 
 
 Texture::~Texture()
@@ -41,15 +63,15 @@ bool Texture::LoadImage(const std::string& inPath)
     fData = stbi_load(inPath.c_str(), &sx, &sy, &numberCanals, STBI_default);
 
     if(fData)
-     {
+    {
         fWidth = sx;
         fHeight = sy;
         fNumberCanals = numberCanals;
-     }
+    }
     else
-     {
-         return false;
-     }
+    {
+        return false;
+    }
 
     return true;
 }
@@ -59,6 +81,17 @@ Texture::Texture(const std::string& inPath)
 {
     LoadImage(inPath);
 }
+
+bool Texture::SaveDataToFile(const std::string &path)
+{
+    if(fData)
+    {
+        stbi_write_png(path.c_str(), fWidth, fHeight, fNumberCanals, fData, fWidth * fNumberCanals);
+        return true;
+    }
+    return false;
+}
+
 
 fm::math::vec4 Texture::GetValue(float u, float v)
 {
@@ -74,7 +107,10 @@ fm::math::vec4 Texture::GetValue(float u, float v)
     return fm::math::vec4(r,g,b,1);
 }
 
- void Texture::GetValue(float u, float v, float* outData)
- {
-     *outData++ = 0;
- }
+
+
+
+void Texture::GetValue(float u, float v, float* outData)
+{
+    *outData++ = 0;
+}

@@ -19,7 +19,7 @@ bool Sphere::Hit(const Ray &r, float tMin, float tMax, HitRecord &record) const
     record.material = fMat.get();
     vec3 oc = r.GetOrigin() - fCenter;
     float a = 2*dot(r.GetDirection());
-    float invertA = 1/a;
+    double invertA = 1.0f/a;
     float c = dot(oc) - fRadius*fRadius;
     float b = 2*dot(oc, r.GetDirection());
     float discriminant = (b*b - 2*a*c);
@@ -39,10 +39,10 @@ bool Sphere::Hit(const Ray &r, float tMin, float tMax, HitRecord &record) const
         temp = (-b + sqrt(discriminant))*invertA;
         if(temp < tMax && temp > tMin)
         {
-
             record.t = temp;
             record.p = r.PointAt(record.t);
             record.normal = (record.p - fCenter)/fRadius;
+            //std::cout << record.normal << std::endl;
             fm::math::GetSphereUV(record.normal, record.uv);
             return true;
         }

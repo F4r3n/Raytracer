@@ -22,7 +22,8 @@
 #include <sstream>
 #include <iomanip>
 #include "texture.h"
-#define EARLY_DISPLAY 1
+#define DISPLAY 1
+#define EARLY_DISPLAY 1 && DISPLAY
 
 #if EARLY_DISPLAY
 #include <thread>
@@ -55,16 +56,15 @@ vec3 Color(const Ray &r, World *world, int depth, unsigned long &rayCount)
 }
 
 
-static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world, unsigned long &rayCount)
+static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world, int ns, unsigned long &rayCount)
 {
-   const unsigned long int ns = 1;
    unsigned long y;
    unsigned long x;
    const float invWidth = 1.0f/float(width);
    const float invHeight = 1.0f/float(height);
 
    #pragma omp parallel for \
-    shared(camera, world, buffer, rayCount,  width, height) \
+    shared(camera, world, buffer, rayCount,  width, height, ns) \
     private(y, x) schedule(dynamic)
     for(y = 0; y < height; ++y)
     {
@@ -73,7 +73,7 @@ static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned 
          for(x = 0; x < width; ++x)
          {
              vec3 color(0,0,0);
-             for(unsigned long s = 0; s < ns; ++s)
+             for(int s = 0; s < ns; ++s)
              {
                  float u = float(x + fm::math::floatRand())*invWidth;
                  float v = float(y + fm::math::floatRand())*invHeight;
@@ -93,14 +93,14 @@ static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned 
 }
 
 
-unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world, vec3 pos = vec3(0,0,0))
+unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world,int ns, vec3 pos = vec3(0,0,0))
 {
     vec3 lookfrom = pos;
     vec3 lookat(0,0,1);
     Camera cam(lookfrom,lookat,vec3(0,1,0),90,float(width)/float(height), 0.0f, 1.0f);
     unsigned long rayCount = 0;
 
-    UpdateRayTracer(width, height, backBuffer,&cam, world, rayCount);
+    UpdateRayTracer(width, height, backBuffer,&cam, world, ns, rayCount);
 
     return rayCount;
 }
@@ -123,9 +123,11 @@ void CopyAvergareRecursif(unsigned int n, unsigned long width, unsigned long hei
         }
     }
 }
+static bool over = false;
 static unsigned long rayCount;
-#if EARLY_DISPLAY
 static unsigned long elapsedTime;
+#if EARLY_DISPLAY
+
 
 void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world)
 {
@@ -134,15 +136,17 @@ void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned l
 
     while(run)
     {
-
         if(n < 128)
         {
              Profile p;
-            rayCount = Draw(data, width, height, world);
+            rayCount = Draw(data, width, height, world, 1);
             p.stop();
             elapsedTime = p.elapsed;
             CopyAvergareRecursif(n, width, height, backBuffer, data);
             n++;
+        }else {
+            over = true;
+
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -153,15 +157,10 @@ void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned l
 
 int main()
 {
-    vec3 a = vec3(1,1,1);
-    a+=vec3(1,1,2);
-    std::cout << a << std::endl;
-    std::cout << a.x << std::endl;
-    //return 0;
-
-    const unsigned long width = 1024;
-    const unsigned long height = 512;
-
+    const unsigned long width = 1280;
+    const unsigned long height = 720;
+    Texture mainTexture(width, height, 3);
+#if DISPLAY
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window * window = SDL_CreateWindow("Raytracer",
                                            SDL_WINDOWPOS_CENTERED,
@@ -171,7 +170,7 @@ int main()
     SDL_ShowWindow(window);
     SDL_Surface * screen = SDL_GetWindowSurface(window);
 
-    unsigned char *data = new unsigned char[width * height * 3];
+
 
     Uint32 rmask, gmask, bmask, amask;
 
@@ -190,10 +189,20 @@ int main()
     #endif
 
     SDL_Surface * imageSurface = SDL_CreateRGBSurfaceFrom(
-                data, width, height, 24, width * 3,
+                mainTexture.GetPtr(), width, height, 24, width * 3,
                 rmask, gmask, bmask, amask);
 
     SDL_Rect surfaceToBlit = { 0, 0, width, height };
+
+    if(TTF_Init() == -1)
+    {
+        fprintf(stderr, "Erreur d'initialisation de TTF_Init : %s\n", TTF_GetError());
+          exit(EXIT_FAILURE);
+    }
+    TTF_Font* arial = TTF_OpenFont("Resources/arial.ttf", 12);
+
+
+#endif
 
 
     World world;
@@ -214,31 +223,26 @@ int main()
     //world.AddObject(sphere5);
     //world.AddObject(sphere6);
 
-
-    if(TTF_Init() == -1)
-    {
-        fprintf(stderr, "Erreur d'initialisation de TTF_Init : %s\n", TTF_GetError());
-          exit(EXIT_FAILURE);
-    }
-    TTF_Font* arial = TTF_OpenFont("Resources/arial.ttf", 12);
-
 #if EARLY_DISPLAY
-    std::thread t(runGraphicThread, data, width, height, &world);
+    std::thread t(runGraphicThread, mainTexture.GetPtr(), width, height, &world);
 #endif
 
+    bool saved = false;
     while (run)
     {
+#if DISPLAY
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) run = false;
 
         }
-
+#endif
 
          std::stringstream stream;
+#if DISPLAY
 #if !EARLY_DISPLAY
         Profile p;
-        rayCount = Draw(data, width, height, &world);
+        rayCount = Draw(mainTexture.GetPtr(), width, height, &world);
         p.stop();
         std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
         stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
@@ -248,6 +252,7 @@ int main()
 
         std::string s = stream.str() + " mr/s";
         SDL_Surface* surfaceMessage = TTF_RenderText_Blended(arial, s.c_str(), {255, 0, 0});
+
 
 #if !EARLY_DISPLAY
         SDL_BlitSurface(surfaceMessage, NULL, imageSurface, NULL);
@@ -260,17 +265,39 @@ int main()
         SDL_UpdateWindowSurface(window);
         SDL_Delay(16);
         SDL_FreeSurface(surfaceMessage);
+
+#else
+         Profile p;
+         rayCount = Draw(mainTexture.GetPtr(), width, height, &world, 128);
+         p.stop();
+         std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
+         stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
+         std::string s = stream.str() + " mr/s";
+         std::cout << s << std::endl;
+         over = true;
+         if(over && !saved)
+         {
+             run = false;
+         }
+
+#endif
+        if(over && !saved)
+        {
+
+            mainTexture.SaveDataToFile("final.png");
+
+        }
     }
 
 #if EARLY_DISPLAY
     t.join();
 #endif
+    #if DISPLAY
     SDL_FreeSurface(imageSurface);
 
     SDL_DestroyWindow(window);
     SDL_Quit();
+#endif
 
-
-    delete data;
     return 0;
 }
