@@ -2,6 +2,7 @@
 #define HITABLE_HPP
 #include <memory>
 #include "Ray.hpp"
+#include "Math/Vector2.h"
 class Material;
 struct HitRecord
 {
@@ -9,6 +10,7 @@ struct HitRecord
     fm::math::vec3 p;
     fm::math::vec3 normal;
     Material* material;
+    fm::math::vec2 uv;
 };
 
 class Hitable

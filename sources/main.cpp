@@ -17,55 +17,18 @@
 #include "Math/helpers.h"
 #include "material.h"
 #include <omp.h>
-#include <chrono>
+#include "profile.h"
 #include <SDL2/SDL_ttf.h>
 #include <sstream>
 #include <iomanip>
-
+#include "texture.h"
 #define EARLY_DISPLAY 1
 
 #if EARLY_DISPLAY
 #include <thread>
 #endif
 
-class Profile {
-
-public:
-    Profile() {
-        start = std::chrono::system_clock::now();
-        running= true;
-    }
-    Profile(const std::string& name)
-    {
-        fName = name;
-        start = std::chrono::system_clock::now();
-        running = true;
-    }
-
-    ~Profile()
-    {
-        stop();
-    }
-
-    void stop()
-    {
-        end = std::chrono::system_clock::now();
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        running = false;
-    }
-    unsigned long elapsed = 0;
-
-private:
-    std::chrono::system_clock::time_point start;
-    std::chrono::system_clock::time_point end;
-    std::string fName;
-    bool running = false;
-};
-
 using namespace fm::math;
-
-
-
 bool run = true;
 
 
@@ -95,10 +58,10 @@ vec3 Color(const Ray &r, World *world, int depth, unsigned long &rayCount)
 static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned char* buffer, Camera *camera, World *world, unsigned long &rayCount)
 {
    const unsigned long int ns = 1;
-unsigned long y;
-unsigned long x;
-const float invWidth = 1.0f/float(width);
-const float invHeight = 1.0f/float(height);
+   unsigned long y;
+   unsigned long x;
+   const float invWidth = 1.0f/float(width);
+   const float invHeight = 1.0f/float(height);
 
    #pragma omp parallel for \
     shared(camera, world, buffer, rayCount,  width, height) \
@@ -130,7 +93,7 @@ const float invHeight = 1.0f/float(height);
 }
 
 
-unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world, vec3 pos)
+unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world, vec3 pos = vec3(0,0,0))
 {
     vec3 lookfrom = pos;
     vec3 lookat(0,0,1);
@@ -140,7 +103,6 @@ unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long
     UpdateRayTracer(width, height, backBuffer,&cam, world, rayCount);
 
     return rayCount;
-
 }
 
 void CopyAvergareRecursif(unsigned int n, unsigned long width, unsigned long height, unsigned char* backBuffer, unsigned char* buffer)
@@ -158,11 +120,9 @@ void CopyAvergareRecursif(unsigned int n, unsigned long width, unsigned long hei
             backBufferTemp++;
             *backBufferTemp = float(*backBufferTemp*n + *bufferTemp++)/float(n+ 1);
             backBufferTemp++;
-
         }
     }
 }
-static vec3 pos;
 static unsigned long rayCount;
 #if EARLY_DISPLAY
 static unsigned long elapsedTime;
@@ -171,18 +131,14 @@ void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned l
 {
     int n = 0;
     unsigned char *data = new unsigned char[width * height * 3];
-    vec3 previousPos = vec3(0,0,0);
+
     while(run)
     {
-        if(length(pos - previousPos) > 0)
-        {
-            previousPos = pos;
-            n = 0;
-        }
+
         if(n < 128)
         {
              Profile p;
-            rayCount = Draw(data, width, height, world, pos);
+            rayCount = Draw(data, width, height, world);
             p.stop();
             elapsedTime = p.elapsed;
             CopyAvergareRecursif(n, width, height, backBuffer, data);
@@ -241,7 +197,9 @@ int main()
 
 
     World world;
-    std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
+    std::shared_ptr<Lambertian> l = std::make_shared<Lambertian>(vec3(1.0,1.0,1.0));
+    l->texture = std::make_shared<Texture>("Resources/ground.jpg");
+    std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, l);
     std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
     std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
     std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
@@ -280,11 +238,10 @@ int main()
          std::stringstream stream;
 #if !EARLY_DISPLAY
         Profile p;
-        rayCount = Draw(data, width, height, &world, pos);
+        rayCount = Draw(data, width, height, &world);
         p.stop();
         std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
         stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;
-
 #else
          stream << std::fixed << std::setprecision(2) << (rayCount/(elapsedTime/(1000.0f)))/1000000.0f;
 #endif
@@ -303,9 +260,9 @@ int main()
         SDL_UpdateWindowSurface(window);
         SDL_Delay(16);
         SDL_FreeSurface(surfaceMessage);
-
     }
-    #if EARLY_DISPLAY
+
+#if EARLY_DISPLAY
     t.join();
 #endif
     SDL_FreeSurface(imageSurface);

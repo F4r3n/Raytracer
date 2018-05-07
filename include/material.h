@@ -4,18 +4,12 @@
 #include "hitable.hpp"
 #include "Math/helpers.h"
 #include <iostream>
-
+#include "texture.h"
 
 typedef fm::math::vec3 vec3;
 
 
-template <typename T>
-T clamp(T v, T max, T min)
-{
-    if(v < min) return min;
-    if(v > max) return max;
-    return v;
-}
+
 
 class Material
 {
@@ -26,16 +20,26 @@ public:
 class Lambertian : public Material
 {
 public:
-    Lambertian(const fm::math::vec3 albedo): albedo(albedo){}
+    Lambertian(const fm::math::vec3 albedo): albedo(albedo)
+    {
+    }
     virtual bool Scatter(const Ray &ray, const HitRecord &record, fm::math::vec3 &attenuation, Ray &scattered)
     {
         fm::math::vec3 target = record.p + record.normal + fm::math::randomInUnitSphere();
         scattered = Ray(record.p, target - record.p);
         attenuation = albedo;
-        //std::cout << albedo << std::endl;
+        if(texture && texture->isValid())
+        {
+            fm::math::vec4 colorTexture = texture->GetValue(record.uv.x, record.uv.y);
+            attenuation.x*=colorTexture.x;
+            attenuation.y*=colorTexture.y;
+            attenuation.z*=colorTexture.z;
+        }
+
         return true;
     }
     fm::math::vec3 albedo;
+    std::shared_ptr<Texture> texture = nullptr;
 };
 
 class Metal : public Material
@@ -43,7 +47,7 @@ class Metal : public Material
 public:
     Metal(const fm::math::vec3 albedo, float f = 0.1f): albedo(albedo)
     {
-        fFuzz = clamp(f, 1.0f, 0.0f);
+        fFuzz = fm::math::clamp(f, 1.0f, 0.0f);
     }
     virtual bool Scatter(const Ray &ray, const HitRecord &record, fm::math::vec3 &attenuation, Ray &scattered)
     {

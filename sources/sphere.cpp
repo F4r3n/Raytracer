@@ -32,16 +32,23 @@ bool Sphere::Hit(const Ray &r, float tMin, float tMax, HitRecord &record) const
             record.t = temp;
             record.p = r.PointAt(record.t);
             record.normal = (record.p - fCenter)/fRadius;
+            fm::math::GetSphereUV(record.normal, record.uv);
+
             return true;
         }
-        temp = -b + sqrt(discriminant)*invertA;
+        temp = (-b + sqrt(discriminant))*invertA;
         if(temp < tMax && temp > tMin)
         {
+
             record.t = temp;
             record.p = r.PointAt(record.t);
             record.normal = (record.p - fCenter)/fRadius;
+            fm::math::GetSphereUV(record.normal, record.uv);
             return true;
         }
     }
     return false;
 }
+
+
+

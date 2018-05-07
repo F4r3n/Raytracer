@@ -1,8 +1,27 @@
 #pragma once
 #include "Math/Vector3.h"
+#include "Math/Functions.h"
+#include "Math/Vector2.h"
 #include <random>
+#include <cmath>
 namespace fm {
 namespace math {
+
+template <typename T>
+T clamp(T v, T max, T min)
+{
+    if(v < min) return min;
+    if(v > max) return max;
+    return v;
+}
+
+inline void GetSphereUV(const vec3 &p, vec2 &uv)
+{
+float phi = std::atan2(p.z, p.x);
+float theta = std::asin(p.y);
+uv.x = 1 - (phi + pi())/(2*pi());
+uv.y = (theta + pi()/2.0f)/(pi());
+}
 
 inline float floatRand() {
     static thread_local std::mt19937 generator;
