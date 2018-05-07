@@ -53,6 +53,7 @@ vec3 Color(const Ray &r, World *world, int depth, unsigned long &rayCount)
     vec3 dir = normalize(r.GetDirection());
     float t = 0.5f*(dir.y + 1.0);
     return (1.0f - t)*vec3(1.0,1.0,1.0) + t*vec3(0.5f,0.7f,1.0f);
+    //return vec3(1,1,1);
 }
 
 
@@ -209,9 +210,9 @@ int main()
     std::shared_ptr<Lambertian> l = std::make_shared<Lambertian>(vec3(1.0,1.0,1.0));
     l->texture = std::make_shared<Texture>("Resources/ground.jpg");
     std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, l);
-    std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
-    std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
-    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
+        std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
+        std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
+        std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
     //std::unique_ptr<Hitable> sphere5 = std::make_unique<Sphere>(vec3(-1,0,-1),-0.45f, std::make_shared<Dielectric>(1.5f));
     //std::unique_ptr<Hitable> sphere6 = std::make_unique<Sphere>(vec3(-1,0,-1.5),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
 

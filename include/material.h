@@ -53,7 +53,7 @@ public:
     {
         fm::math::vec3 reflect = reflectance(normalize(ray.GetDirection()), record.normal);
         attenuation = albedo;
-        scattered = Ray(record.p, reflect + fFuzz*fm::math::randomInUnitSphere());
+        scattered = Ray(record.p, reflect + fFuzz*fm::math::randomInUnitSphere()*dot(reflect, record.normal));
         return dot(scattered.GetDirection(), record.normal) > 0;
     }
     fm::math::vec3 albedo;
