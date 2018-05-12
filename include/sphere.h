@@ -13,6 +13,14 @@ public:
     fm::math::vec3 fCenter;
     float fRadius;
     std::shared_ptr<Material> fMat;
+    void SetRadius(float radius)
+    {
+        fRadius = radius;
+        fSquaredRadius = fRadius*fRadius;
+    }
+
+private:
+    float fSquaredRadius;
 };
 
 #endif // SPHERE

@@ -3,7 +3,10 @@
 #else
 #define SIMD 0
 #endif
+#undef SIMD
+#define SIMD 1
 
+#include "Math/constants.hpp"
 #include <iostream>
 #include "Math/Functions.h"
 #include <SDL.h>
@@ -22,6 +25,7 @@
 #include <sstream>
 #include <iomanip>
 #include "texture.h"
+#include "plane.hpp"
 #define DISPLAY 1
 #define EARLY_DISPLAY 1 && DISPLAY
 
@@ -37,23 +41,22 @@ vec3 Color(const Ray &r, World *world, int depth, unsigned long &rayCount)
 {
     rayCount++;
     HitRecord record;
-    if(world->Hit(r, 0.001f, std::numeric_limits<float>::max(), record))
+    if(world->Hit(r, EPSILON, std::numeric_limits<float>::max(), record))
     {
         Ray scattered;
         vec3 attenuation;
+        vec3 emitted = record.material->Emitted(record.uv, record.p);
+
         if(depth < 50 && record.material->Scatter(r, record, attenuation, scattered))
         {
-            return attenuation*Color(scattered, world, depth + 1, rayCount);
+            return emitted + attenuation*Color(scattered, world, depth + 1, rayCount);
         }else
         {
-            return vec3(0,0,0);
+            return emitted;
         }
     }
 
-    vec3 dir = normalize(r.GetDirection());
-    float t = 0.5f*(dir.y + 1.0);
-    return (1.0f - t)*vec3(1.0,1.0,1.0) + t*vec3(0.5f,0.7f,1.0f);
-    //return vec3(1,1,1);
+    return vec3(0.1f,0.1f,0.1f);
 }
 
 
@@ -84,17 +87,35 @@ static void UpdateRayTracer(unsigned long width, unsigned long height, unsigned 
              }
              color/=(float)ns;
              color = vec3(sqrt(color.x), sqrt(color.y), sqrt(color.z));
-             backBuffer[0] = color.x*255.99f;
-             backBuffer[1] = color.y*255.99f;
-             backBuffer[2] = color.z*255.99f;
+             backBuffer[0] = clamp(color.x*255.99f, 255.0f,0.0f);
+             backBuffer[1] = clamp(color.y*255.99f, 255.0f,0.0f);
+             backBuffer[2] = clamp(color.z*255.99f, 255.0f,0.0f);
              backBuffer += 3;
          }
      }
 
 }
 
+void LaunchRay(int x, int y, unsigned char* buffer, long width, long height, Camera *camera, World *world)
+{
+    unsigned long int rayCount = 0;
+    unsigned char* backBuffer = buffer + width*3*y + x*3;
+    vec3 color(backBuffer[0],backBuffer[1],backBuffer[2]);
 
-unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world,int ns, vec3 pos = vec3(0,0,0))
+    float u = float(x + fm::math::floatRand())*(1.0f/float(width));
+    float v = float(y + fm::math::floatRand())*(1.0f/float(height));
+    Ray r = camera->GetRay(u,v);
+    vec3 col = Color(r, world, 0, rayCount);
+    color += col;
+
+    color = vec3(sqrt(color.x), sqrt(color.y), sqrt(color.z));
+    backBuffer[0] = color.x*255.99f;
+    backBuffer[1] = color.y*255.99f;
+    backBuffer[2] = color.z*255.99f;
+
+}
+
+unsigned long Draw(unsigned char* backBuffer, unsigned long width, unsigned long height, World *world,int ns, vec3 pos = vec3(0,0,0.0f))
 {
     vec3 lookfrom = pos;
     vec3 lookat(0,0,1);
@@ -127,6 +148,7 @@ void CopyAvergareRecursif(unsigned int n, unsigned long width, unsigned long hei
 static bool over = false;
 static unsigned long rayCount;
 static unsigned long elapsedTime;
+static bool update = true;
 #if EARLY_DISPLAY
 
 
@@ -137,17 +159,20 @@ void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned l
 
     while(run)
     {
-        if(n < 128)
+        if(update)
         {
-             Profile p;
-            rayCount = Draw(data, width, height, world, 1);
-            p.stop();
-            elapsedTime = p.elapsed;
-            CopyAvergareRecursif(n, width, height, backBuffer, data);
-            n++;
-        }else {
-            over = true;
+            if(n < 128)
+            {
+                 Profile p;
+                rayCount = Draw(data, width, height, world, 1);
+                p.stop();
+                elapsedTime = p.elapsed;
+                CopyAvergareRecursif(n, width, height, backBuffer, data);
+                n++;
+            }else {
+                over = true;
 
+            }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -158,8 +183,8 @@ void runGraphicThread(unsigned char* backBuffer, unsigned long width, unsigned l
 
 int main()
 {
-    const unsigned long width = 1280;
-    const unsigned long height = 720;
+    const unsigned long width = 640;
+    const unsigned long height = 360;
     Texture mainTexture(width, height, 3);
 #if DISPLAY
     SDL_Init(SDL_INIT_VIDEO);
@@ -207,22 +232,21 @@ int main()
 
 
     World world;
-    std::shared_ptr<Lambertian> l = std::make_shared<Lambertian>(vec3(1.0,1.0,1.0));
+    std::shared_ptr<DiffuseLight> light = std::make_shared<DiffuseLight>(vec3(2.0,2.0,2.0));
+
+    std::shared_ptr<Lambertian> l = std::make_shared<Lambertian>(vec3(1.0,1.0f,1.0f));
     l->texture = std::make_shared<Texture>("Resources/ground.jpg");
     std::unique_ptr<Hitable> sphere = std::make_unique<Sphere>(vec3(0,0,-1),0.5f, l);
-        std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
-        std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
-        std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
-    //std::unique_ptr<Hitable> sphere5 = std::make_unique<Sphere>(vec3(-1,0,-1),-0.45f, std::make_shared<Dielectric>(1.5f));
-    //std::unique_ptr<Hitable> sphere6 = std::make_unique<Sphere>(vec3(-1,0,-1.5),0.5f, std::make_shared<Lambertian>(vec3(0.8,0.3,0.3)));
-
+    std::unique_ptr<Hitable> sphere2 = std::make_unique<Sphere>(vec3(0,-100.5f,-1),100.0f, std::make_shared<Lambertian>(vec3(0.8,0.8,0.0)));
+    std::unique_ptr<Hitable> sphere3 = std::make_unique<Sphere>(vec3(1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.6,0.2),0.3f));
+    std::unique_ptr<Hitable> sphere4 = std::make_unique<Sphere>(vec3(-1,0,-1),0.5f, std::make_shared<Metal>(vec3(0.8,0.3,0.9),0.9f));
+    std::unique_ptr<Hitable> lightSphere = std::make_unique<Sphere>(vec3(0,1,1),1.0f, light);
 
     world.AddObject(sphere);
     world.AddObject(sphere2);
     world.AddObject(sphere3);
     world.AddObject(sphere4);
-    //world.AddObject(sphere5);
-    //world.AddObject(sphere6);
+    world.AddObject(lightSphere);
 
 #if EARLY_DISPLAY
     std::thread t(runGraphicThread, mainTexture.GetPtr(), width, height, &world);
@@ -235,6 +259,30 @@ int main()
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) run = false;
+            switch(e.type)
+            {
+                case SDL_QUIT:
+                    run = false;
+                break;
+            case SDL_KEYDOWN:
+            {
+                 if(e.key.keysym.scancode == SDL_SCANCODE_U)
+                 {
+                     update = !update;
+                 }
+                 break;
+            }
+            case SDL_MOUSEBUTTONDOWN:
+                vec3 lookfrom = vec3(0,0,0);
+                vec3 lookat(0,0,1);
+                int x;
+                int y;
+                SDL_GetMouseState(&x, &y);
+                Camera cam(lookfrom,lookat,vec3(0,1,0),90,float(width)/float(height), 0.0f, 1.0f);
+                    LaunchRay(x,y,mainTexture.GetPtr(), width, height,&cam, &world );
+             break;
+
+            }
 
         }
 #endif
@@ -243,7 +291,7 @@ int main()
 #if DISPLAY
 #if !EARLY_DISPLAY
         Profile p;
-        rayCount = Draw(mainTexture.GetPtr(), width, height, &world);
+        rayCount = Draw(mainTexture.GetPtr(), width, height, &world, 1);
         p.stop();
         std::cout << rayCount << " " << p.elapsed/1000.0f << std::endl;
         stream << std::fixed << std::setprecision(2) << (rayCount/(p.elapsed/(1000.0f)))/1000000.0f;

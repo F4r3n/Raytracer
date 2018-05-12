@@ -464,6 +464,9 @@ template <typename T> vec<T, 2> operator/(const vec<T, 2>& a, T b) {
 template <typename T> vec<T, 3> operator/(const vec<T, 3>& a, T b) {
     return vec<T, 3>(a.x / b, a.y / b, a.z / b);
 }
+ template <typename T> vec<T, 3> operator/(const vec<T, 3>& a, const vec<T, 3>& b) {
+     return vec<T, 3>(a.x / b.x, a.y / b.y, a.z / b.z);
+ }
 template <typename T> vec<T, 4> operator/(const vec<T, 4>& a, T b) {
     return vec<T, 4>(a.x / b, a.y / b, a.z / b, a.w / b);
 }
@@ -479,8 +482,14 @@ template <typename T> vec<T, 4> normalize(const vec<T, 4>& vector) {
 }
 
 template <typename T> vec<T, 3> normalize(const vec<T, 3>& vector) {
+#if !SIMD
     T s = 1.0/std::sqrt(vector.x*vector.x + vector.y*vector.y + vector.z*vector.z);
     return vec<T, 3>(vector.x * s, vector.y * s, vector.z * s);
+#else
+
+     T s = 1.0/dot(vector);
+     return vec<T, 3>(vector.x * s, vector.y * s, vector.z * s);
+#endif
 }
 
 template <typename T> vec<T, 2> normalize(const vec<T, 2>& vector) {

@@ -3,7 +3,7 @@
 Ray::Ray(const fm::math::vec3 &inOrigin, const fm::math::vec3 inDirection)
 {
     fOrigin = inOrigin;
-    fDirection = inDirection;
+    fDirection = normalize(inDirection);
 }
 
 fm::math::vec3 Ray::PointAt(float t) const

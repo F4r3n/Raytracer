@@ -1,0 +1,7 @@
+#ifndef CONSTANTS_HPP
+#define CONSTANTS_HPP
+
+#define EPSILON 0.00001f
+
+#endif // CONSTANTS_HPP
+

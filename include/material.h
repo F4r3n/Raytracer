@@ -7,7 +7,7 @@
 #include "texture.h"
 
 typedef fm::math::vec3 vec3;
-
+typedef fm::math::vec2 vec2;
 
 
 
@@ -15,6 +15,28 @@ class Material
 {
 public:
     virtual bool Scatter(const Ray &ray, const HitRecord &record, fm::math::vec3 &attenuation, Ray & scattered) = 0;
+    virtual vec3 Emitted(const vec2 & uv, const vec3 &p) {return vec3(0,0,0);}
+};
+
+class DiffuseLight : public Material
+{
+public:
+    DiffuseLight(const vec3 &albedo):albedo(albedo) {}
+    bool Scatter(const Ray &ray, const HitRecord &record, fm::math::vec3 &attenuation, Ray & scattered) {return false;}
+    vec3 Emitted(const vec2 & uv, const vec3 &p)
+    {
+        vec3 color = albedo;
+        if(texture && texture->IsValid())
+        {
+            fm::math::vec4 colorTexture = texture->GetValue(uv.x, uv.y);
+            color.x*=colorTexture.x;
+            color.y*=colorTexture.y;
+            color.z*=colorTexture.z;
+        }
+        return color;
+    }
+    fm::math::vec3 albedo;
+    std::shared_ptr<Texture> texture = nullptr;
 };
 
 class Lambertian : public Material

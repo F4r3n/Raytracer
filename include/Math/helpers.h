@@ -17,10 +17,10 @@ T clamp(T v, T max, T min)
 
 inline void GetSphereUV(const vec3 &p, vec2 &uv)
 {
-float phi = std::atan2(p.z, p.x);
-float theta = std::asin(p.y);
-uv.x = 1 - (phi + pi())/(2*pi());
-uv.y = (theta + pi()/2.0f)/(pi());
+    float phi = std::atan2(p.z, p.x);
+    float theta = std::asin(p.y);
+    uv.x = 1 - (phi + pi())/(twoPi());
+    uv.y = (theta + halfPi())/(pi());
 }
 
 inline float floatRand() {
